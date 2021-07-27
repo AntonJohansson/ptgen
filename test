@@ -1,0 +1,3 @@
+# Hello I am a comment
+
+Hamiltonian = 0 + 2*sum(i,j,k,l){ c(i)*c(j)*a(k)*a(l) }
