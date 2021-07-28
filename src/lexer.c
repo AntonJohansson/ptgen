@@ -17,6 +17,7 @@ enum token_type {
     DIV,
     MUL,
     POW,
+    FACTORIAL,
     ASSIGN,
     /* Parens */
     LPAREN,
@@ -25,6 +26,12 @@ enum token_type {
     RBRACKET,
     LBRACE,
     RBRACE,
+    /* Reserved */
+    CREATE_OP,
+    ANNIHI_OP,
+    SUM,
+    EXP,
+    SQRT,
     /* Literals */
     NUMBER,
     IDENTIFIER,
@@ -41,7 +48,9 @@ struct token {
     (struct token) { .type = t, .loc = l }
 
 void print_location(struct location *loc, const u8 *fmt, ...) {
+    printf(CBEGIN FG_CYAN CEND);
     u64 size = printf("  %s:%u | ", loc->file, loc->line);
+    printf(CBEGIN RESET CEND);
 
     const u8 *begin = loc->at;
     while (*begin && *begin != '\n') {
@@ -66,6 +75,8 @@ void print_location(struct location *loc, const u8 *fmt, ...) {
         putchar(' ');
     }
 
+    printf(CBEGIN FG_CYAN CEND);
+
     putchar('^');
 
     if (loc->len > 3) {
@@ -82,6 +93,8 @@ void print_location(struct location *loc, const u8 *fmt, ...) {
     va_start(args, fmt);
     vprintf(fmt, args);
     va_end(args);
+
+    printf(CBEGIN RESET CEND);
 }
 
 static inline bool match(struct lexer *lex, const u8 *str) {
@@ -153,6 +166,11 @@ static void next_token(struct lexer *lex, struct token *tok) {
             lex->loc.at++;
             return;
         }
+        case '!': {
+            *tok = TOKEN(FACTORIAL, lex->loc);
+            lex->loc.at++;
+            return;
+        }
         case '=': {
             *tok = TOKEN(ASSIGN, lex->loc);
             lex->loc.at++;
@@ -188,6 +206,29 @@ static void next_token(struct lexer *lex, struct token *tok) {
             lex->loc.at++;
             return;
         }
+    }
+
+    /* Reserved */
+    if (*lex->loc.at == 'c') {
+        *tok = TOKEN(CREATE_OP, lex->loc);
+        lex->loc.at++;
+        return;
+    } else if (*lex->loc.at == 'a') {
+        *tok = TOKEN(ANNIHI_OP, lex->loc);
+        lex->loc.at++;
+        return;
+    } else if (strncmp(lex->loc.at, "sum", 3) == 0) {
+        *tok = TOKEN(SUM, lex->loc);
+        lex->loc.at++;
+        return;
+    } else if (strncmp(lex->loc.at, "exp", 3) == 0) {
+        *tok = TOKEN(EXP, lex->loc);
+        lex->loc.at++;
+        return;
+    } else if (strncmp(lex->loc.at, "sqrt", 4) == 0) {
+        *tok = TOKEN(SQRT, lex->loc);
+        lex->loc.at++;
+        return;
     }
 
     /* Numbers */
