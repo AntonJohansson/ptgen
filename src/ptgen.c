@@ -60,11 +60,24 @@ static void die(const char *fmt, ...) {
     exit(EXIT_FAILURE);
 }
 
+static const char *xstrndup(const char *src, u8 len) {
+    const char *ret = strndup(src, len);
+    if (!ret) {
+        die("strndup failed - %s\n", strerror(errno));
+    }
+    return ret;
+};
+
 #include "lexer.c"
+#include "ast.c"
 #include "parser.c"
 
-i32 main(i32 argc, u8 **argv) {
-    const u8 *filepath = argv[1];
+int main(int argc, char **argv) {
+    if (argc != 1) {
+        die("Usage: ptgen input_file");
+    }
+
+    const char *filepath = argv[1];
 
     FILE *fd = fopen(filepath, "r");
     if (!fd) {
@@ -91,7 +104,7 @@ i32 main(i32 argc, u8 **argv) {
         die("(fread) failed to read entire file!\n");
     }
 
-    lex(filepath, buf, size);
+    parse(filepath, buf, size);
 
     fclose(fd);
     return 0;

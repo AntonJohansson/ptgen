@@ -97,7 +97,7 @@ void print_location(struct location *loc, const u8 *fmt, ...) {
     printf(CBEGIN RESET CEND);
 }
 
-static inline bool match(struct lexer *lex, const u8 *str) {
+static inline bool match_str(struct lexer *lex, const u8 *str) {
     u8 len = strlen(str);
     for (u8 i = 0; i < len; ++i) {
         if (lex->loc.at[i] != str[i]) {
@@ -109,7 +109,7 @@ static inline bool match(struct lexer *lex, const u8 *str) {
 }
 
 static void consume_until(struct lexer *lex, const u8 *str) {
-    while (*(lex->loc.at) && !match(lex, str)) {
+    while (*(lex->loc.at) && !match_str(lex, str)) {
         lex->loc.at++;
     }
 
@@ -259,22 +259,4 @@ static void next_token(struct lexer *lex, struct token *tok) {
 
     print_location(&lex->loc, "Unknown token\n");
     die("Doesn't know how to handle unknown tokens\n");
-}
-
-
-static void lex(const u8 *filepath, const u8 *buf, const u64 size) {
-    struct lexer lex = {
-        .loc = {
-            .at = buf,
-            .file = filepath,
-            .line = 1,
-            .len = 1,
-        },
-    };
-
-    struct token tok;
-    while (*(lex.loc.at)) {
-        next_token(&lex, &tok);
-        print_location(&tok.loc, "tok: %u\n", tok.type);
-    }
 }
