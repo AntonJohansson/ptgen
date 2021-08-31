@@ -1,4 +1,4 @@
-#define AST_NODE_MAX_CHILDREN 2
+#define AST_NODE_MAX_CHILDREN 8
 
 enum ast_node_type {
     AST_UNKNOWN = 0,
@@ -9,6 +9,7 @@ enum ast_node_type {
     AST_BINARY_OP,
     AST_VAR,
     AST_POSTFIX,
+    AST_SUM,
 };
 
 struct ast_constant {

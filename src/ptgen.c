@@ -57,7 +57,7 @@ static void die(const char *fmt, ...) {
     vfprintf(stderr, fmt, args);
     va_end(args);
 
-    exit(EXIT_FAILURE);
+    abort();
 }
 
 static const char *xstrndup(const char *src, u8 len) {
@@ -73,7 +73,7 @@ static const char *xstrndup(const char *src, u8 len) {
 #include "parser.c"
 
 int main(int argc, char **argv) {
-    if (argc != 1) {
+    if (argc != 2) {
         die("Usage: ptgen input_file");
     }
 

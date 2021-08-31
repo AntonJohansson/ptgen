@@ -219,15 +219,15 @@ static void next_token(struct lexer *lex, struct token *tok) {
         return;
     } else if (strncmp(lex->loc.at, "sum", 3) == 0) {
         *tok = TOKEN(SUM, lex->loc);
-        lex->loc.at++;
+        lex->loc.at += 3;
         return;
     } else if (strncmp(lex->loc.at, "exp", 3) == 0) {
         *tok = TOKEN(EXP, lex->loc);
-        lex->loc.at++;
+        lex->loc.at += 3;
         return;
     } else if (strncmp(lex->loc.at, "sqrt", 4) == 0) {
         *tok = TOKEN(SQRT, lex->loc);
-        lex->loc.at++;
+        lex->loc.at += 4;
         return;
     }
 

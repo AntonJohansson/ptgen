@@ -14,7 +14,15 @@
  *
  *   <postfix-exp> ::= <primary-exp> | <primary-exp> "!"
  *
- *   <primary-exp> ::= "(" <comma-exp> ")" | <id>
+ *   <primary-exp> ::= "(" <add-exp> ")" | <constant> | <call-exp> | <sum-exp> | <id>
+ *
+ *   <sum-exp> ::= "SUM" "(" <id-list-exp> ")" "{" <add-exp> "}"
+ *
+ *   <id-list-exp> ::= <id> { "," <id> }
+ *
+ *   <call-exp> ::= <id> "(" <param-exp> ")"
+ *
+ *   <param-exp> ::= <add-exp> { "," <add-exp> }
  */
 
 #define TOKEN_BUF_LEN 16
@@ -47,6 +55,18 @@ void pop_token(struct token_buffer *buf, struct token *tok) {
 
     buf->begin = (buf->begin + 1) % TOKEN_BUF_LEN;
     buf->len--;
+}
+
+void peep_token(struct token_buffer *buf, struct token *tok) {
+    if (buf->len == 0) {
+        die("Cannot peek empty buffer!\n");
+    }
+
+    if (!tok) {
+        die("Need to supply tok!\n");
+    }
+
+    *tok = buf->toks[buf->begin];
 }
 
 struct parser {
@@ -83,11 +103,15 @@ static void assert_space_in_buffer(struct token_buffer *buf, u8 len) {
 
 static void expect(struct token_buffer *buf, enum token_type tok_type, struct token *tok) {
     assert_space_in_buffer(buf, 1);
-    pop_token(buf, tok);
-    if (tok->type != tok_type) {
+    struct token t;
+    pop_token(buf, &t);
+    if (t.type != tok_type) {
         error("Token mismatch!\n");
         print_location(&buf->toks[buf->begin].loc, "Expected: %u\n", tok_type);
         die("Cannot recover!\n");
+    }
+    if (tok) {
+        *tok = t;
     }
 }
 
@@ -127,17 +151,51 @@ static bool match(struct token_buffer *buf, enum token_type tok) {
 
 static struct ast_node *parse_add(struct parser *p);
 
-/* <primary-exp> ::= "(" <add-exp> ")" | <constant> |<id> */
+static struct ast_node *parse_reserved_function(struct parser *p) {
+    fetch_tokens_if_needed(p, 2);
+    struct token tok_id;
+    expect(&p->buf, IDENTIFIER, &tok_id);
+    expect(&p->buf, LPAREN, NULL);
+    struct ast_node *node_add = parse_add(p);
+    fetch_tokens_if_needed(p, 1);
+    expect(&p->buf, LPAREN, NULL);
+
+    struct ast_node *node_fun = ast_node_new();
+    node_fun->type = AST_FUN;
+    node_fun->loc  = tok.loc;
+    node_fun->name = xstrndup(tok.loc.at, tok.loc.len);
+    node_fun->children[0] = node_add;
+
+    return node_fun;
+}
+
+static struct ast_node *parse_iden(struct parser *p) {
+    fetch_tokens_if_needed(p, 1);
+    struct token tok;
+    expect(&p->buf, IDENTIFIER, &tok);
+
+    struct ast_node *node_var = ast_node_new();
+    node_var->type = AST_VAR;
+    node_var->loc  = tok.loc;
+    node_var->name = xstrndup(tok.loc.at, tok.loc.len);
+
+    return node_var;
+}
+
+/* <primary-exp> ::= "(" <add-exp> ")" | <constant> | <id> | SUM(<id>,<id>,<id>,<id>){ <add-exp> } */
 static struct ast_node *parse_primary(struct parser *p) {
     struct token tok;
     fetch_tokens_if_needed(p, 1);
-    pop_token(&p->buf, &tok);
+    peep_token(&p->buf, &tok);
 
     if (tok.type == LPAREN) {
+        pop_token(&p->buf, NULL);
         struct ast_node *node_add = parse_add(p);
+        fetch_tokens_if_needed(p, 1);
         expect(&p->buf, RPAREN, NULL);
         return node_add;
     } else if (tok.type == NUMBER) {
+        pop_token(&p->buf, NULL);
         struct ast_node *node_constant = ast_node_new();
         node_constant->type = AST_CONSTANT;
         node_constant->loc  = tok.loc;
@@ -145,11 +203,39 @@ static struct ast_node *parse_primary(struct parser *p) {
         node_constant->constant.value = strtoull(tok.loc.at, NULL, 10);
         return node_constant;
     } else if (tok.type == IDENTIFIER) {
-        struct ast_node *node_var = ast_node_new();
-        node_var->type = AST_VAR;
-        node_var->loc  = tok.loc;
-        node_var->name = xstrndup(tok.loc.at, tok.loc.len);
-        return node_var;
+        struct ast_node *node_iden = parse_iden(p);
+        return node_iden;
+    } else if (tok.type == SUM) {
+        pop_token(&p->buf, NULL);
+        struct ast_node *node_sum = ast_node_new();
+        node_sum->type = AST_SUM;
+        node_sum->loc  = tok.loc;
+        node_sum->name = xstrndup(tok.loc.at, tok.loc.len);
+
+        fetch_tokens_if_needed(p, 10);
+        expect(&p->buf, LPAREN, NULL);
+        struct ast_node *node_id0 = parse_iden(p);
+        expect(&p->buf, COMMA, NULL);
+        struct ast_node *node_id1 = parse_iden(p);
+        expect(&p->buf, COMMA, NULL);
+        struct ast_node *node_id2 = parse_iden(p);
+        expect(&p->buf, COMMA, NULL);
+        struct ast_node *node_id3 = parse_iden(p);
+        expect(&p->buf, RPAREN, NULL);
+
+        fetch_tokens_if_needed(p, 1);
+        expect(&p->buf, LBRACE, NULL);
+        struct ast_node *node_add = parse_add(p);
+        fetch_tokens_if_needed(p, 1);
+        expect(&p->buf, RBRACE, NULL);
+
+        node_sum->children[0] = node_id0;
+        node_sum->children[1] = node_id1;
+        node_sum->children[2] = node_id2;
+        node_sum->children[3] = node_id3;
+        node_sum->children[4] = node_add;
+
+        return node_sum;
     } else {
         error("Unknown primary expression!\n");
         print_location(&tok.loc, "here\n");
