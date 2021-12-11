@@ -37,75 +37,82 @@
 #define INVERSE_OFF   "27"
 
 static void error(const char *fmt, ...) {
-    fprintf(stderr, CBEGIN FG_RED CEND);
-    fprintf(stderr, "Error: ");
-    fprintf(stderr, CBEGIN RESET CEND);
+  fprintf(stderr, CBEGIN FG_RED CEND);
+  fprintf(stderr, "Error: ");
+  fprintf(stderr, CBEGIN RESET CEND);
 
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  va_end(args);
 }
 
 static void die(const char *fmt, ...) {
-    fprintf(stderr, CBEGIN FG_RED ";" BOLD_ON CEND);
-    fprintf(stderr, "Fatal: ");
-    fprintf(stderr, CBEGIN RESET CEND);
+  fprintf(stderr, CBEGIN FG_RED ";" BOLD_ON CEND);
+  fprintf(stderr, "Fatal: ");
+  fprintf(stderr, CBEGIN RESET CEND);
 
+  va_list args;
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  va_end(args);
+
+  abort();
+}
+
+static void inline xassert(bool cond, const char *fmt, ...) {
+  if (!cond) {
     va_list args;
     va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
+    die(fmt, args);
     va_end(args);
-
-    abort();
+  }
 }
 
 static const char *xstrndup(const char *src, u8 len) {
-    const char *ret = strndup(src, len);
-    if (!ret) {
-        die("strndup failed - %s\n", strerror(errno));
-    }
-    return ret;
+  const char *ret = strndup(src, len);
+  if (!ret) {
+    die("strndup failed - %s\n", strerror(errno));
+  }
+  return ret;
 };
 
 #include "lexer.c"
 #include "ast.c"
 #include "parser.c"
 
-int main(int argc, char **argv) {
-    if (argc != 2) {
-        die("Usage: ptgen input_file");
-    }
+i32 main(i32 argc, u8 **argv) {
+  if (argc != 2) {
+    die("Usage: ptgen input_file");
+  }
 
-    const char *filepath = argv[1];
+  const u8 *filepath = argv[1];
 
-    FILE *fd = fopen(filepath, "r");
-    if (!fd) {
-        die("(fopen) %s\n", strerror(errno));
-    }
+  /* Open and read entire file into buffer */
 
-    if(fseek(fd, 0, SEEK_END) == -1) {
-        die("(fseek) %s\n", strerror(errno));
-    }
+  FILE *fd = fopen(filepath, "r");
+  xassert(fd, "(fopen) %s\n", strerror(errno));
 
-    i64 size = ftell(fd);
-    if (size == -1) {
-        die("(ftell) %s\n", strerror(errno));
-    }
+  xassert(fseek(fd, 0, SEEK_END) != -1, "(fseek) %s\n", strerror(errno));
 
-    if (fseek(fd, 0, SEEK_SET) == -1) {
-        die("(fseek) %s\n", strerror(errno));
-    }
+  i64 size = ftell(fd);
+  xassert(size != -1, "(ftell) %s\n", strerror(errno));
 
-    u8 buf[size+1];
-    buf[size] = 0;
+  xassert(fseek(fd, 0, SEEK_SET) != -1, "(fseek) %s\n", strerror(errno));
 
-    if (fread(buf, 1, size, fd) < size) {
-        die("(fread) failed to read entire file!\n");
-    }
+  u8 buf[size+1];
+  buf[size] = 0;
 
-    parse(filepath, buf, size);
+  xassert(fread(buf, 1, size, fd) == size, "(fread) failed to read entire file!\n");
 
-    fclose(fd);
-    return 0;
+  struct token_buffer tok_buf;
+  lex(&tok_buf, filepath, buf, size);
+  dump_token_buffer(&tok_buf);
+
+  struct ast_node *root = parse(&tok_buf);
+  dump_ast_to_dot(root, "ast.dot");
+  dump_ast_to_tex(root, "ast.tex");
+
+  fclose(fd);
+  return 0;
 }
